@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>express</title>
+    <link href="./stylesheets/font-awesome.min.css" rel="stylesheet" type="text/css">
+    <link href="./stylesheets/style.css" rel="stylesheet" type="text/css"/>
+    <script src="./javascripts/jquery.js"></script>
+</head>
+<body>
+<h3>网盘</h3>
+    <button id="add-file-btn">添加文件</button>
+    <button id="create-folder-btn">创建文件夹</button>
+    <ul class="file-container">
+
+    </ul>
+<script>
+    (function(){
+    	var currentParentId = null;
+    	var accessHistory = [];
+    	var currentCtx = [];
+		var $box = $('.file-container');
+    	var api = {
+			getFolderContent: function(folderId){
+                return $.get('/diskapi/queryAll', {
+                	parentId: folderId
+                });
+            },
+            createFile: function(type, name, parentId){
+				return $.post('/diskapi/addFile', {
+					type: type,
+                    name: name,
+                    parentId: parentId
+                });
+            }
+        };
+		api.getFolderContent().then(function(res) {
+			if(res.code === 0) {
+				renderFileList(res.data);
+				accessHistory.push('');
+			}
+		}, function(res){
+			console.error(res);
+		});
+		/**
+         * 上传文件按钮点击
+		 */
+		$('#add-file-btn').click(function(e){
+			e.preventDefault();
+        });
+		/**
+         * 创建文件夹按钮点击
+		 */
+		$('#create-folder-btn').click(function(e){
+			api.createFile('0', Math.random()*100 + '_' + (+new Date()+'').slice(-1,7), currentParentId).then(function(res){
+				api.getFolderContent(currentParentId).then(function(resp){
+					renderFileList(resp.data);
+                });
+            })
+        });
+
+		function renderFileList(data){
+			currentCtx = data;
+			var $fileItem = $('<li class="file-item"><span class="file-icon"></span><span class="file-name"></span><span class="create-time"></span></li>').hide();
+			$box.empty();
+			$.each(data, function(index,item){
+				var $clone = $fileItem.clone();
+				var $icon = $clone.find('.file-icon');
+				if(item.type === 1) {
+					$('<i>').addClass('fa fa-file-code-o').appendTo($icon);
+				}else {
+					$('<i>').addClass('fa fa-folder-o').appendTo($icon);
+				}
+				$clone.find('.file-name').text(item.name);
+				$clone.find('.create-time').text(new Date(+item.createtime).toLocaleString());
+				$clone.attr('data-id', item.id).appendTo($box).show();
+			});
+        }
+
+		/**
+         * 为每个文件、文件夹绑定点击事件
+		 */
+		$box.delegate('.file-item', 'click', function(e){
+			e.preventDefault();
+			e.stopPropagation();
+            var fileId = $(this).attr('data-id');
+            var meta = $.grep(currentCtx, function(ctx){
+            	return ctx.id === fileId;
+            });
+            if(meta[0].type === 0) {
+				api.getFolderContent(fileId).then(function(res){
+					renderFileList(res.data);
+					currentParentId = fileId;
+					accessHistory.push(fileId);
+				});
+            }else {
+                alert('todo: 打开文件！');
+            }
+        });
+	})();
+</script>
+</body>
+</html>
